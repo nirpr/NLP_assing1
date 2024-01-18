@@ -2,17 +2,16 @@ import json
 import random
 from collections import defaultdict
 import time
-
+import pickle
+import os.path
 
 
 def calc_bigram_prob(bigram_dicts, lex_dict, candidates, prev_word):
     unigram_count = lex_dict[prev_word]
-    best_prob = ('', 0)
 
+    best_prob = ('', 0)
     for word in candidates:
-        bigram_prob = bigram_dicts[prev_word][word] / unigram_count # problem here: /
-        # bigram_prob = bigram_dicts[prev_word].get(word, 0) / unigram_countAttributeError: /
-        # 'int' object has no attribute 'get'
+        bigram_prob = bigram_dicts.get(prev_word, {}).get(word, 0) / unigram_count
         if bigram_prob > best_prob[1]:
             best_prob = (word, bigram_prob)
 
@@ -40,17 +39,7 @@ def find_missing_words(cloze, candidates, bigram_dicts, lex_dict):
 
 
 def update_dicts(tokens, prev_word, lex_dict, bigram_dicts):
-    # for word in tokens:
-    #     word = word.lower()
-    #     lex_dict[word] = lex_dict.get(word, 0) + 1
-    #     if prev_word != '':
-    #         if prev_word not in bigram_dicts:
-    #             bigram_dicts[prev_word] = {word: 1}
-    #         else:
-    #             bigram_dicts[prev_word][word] = bigram_dicts[prev_word].get(word, 0) + 1
-    #     prev_word = word
-
-    for word in tokens: # new change
+    for word in tokens:  # new change
         word = word.lower()
         lex_dict[word] = lex_dict.get(word, 0) + 1
         bigram_dicts[prev_word][word] = bigram_dicts[prev_word].get(word, 0) + 1
@@ -74,13 +63,24 @@ def initialize_dicts(lexicon, corpus):
             prev_word = update_dicts(tokens, prev_word, lexicon_dict, bigram_dicts)
             if i % 100000 == 0:
                 print(i)
-    return lexicon_dict, bigram_dicts
+
+    data = (lexicon_dict, bigram_dicts)
+    return data
 
 
 def solve_cloze(input, candidates, lexicon, corpus):
     # todo: implement this function
     print(f'starting to solve the cloze {input} with {candidates} using {lexicon} and {corpus}')
-    lex_dict, bigram_dicts = initialize_dicts(lexicon, corpus)
+
+    if not os.path.isfile('dicts.pkl'):
+        data = initialize_dicts(lexicon, corpus)
+        print('creating pickle')
+        pickle.dump(data, open('dicts.pkl', 'wb'))
+
+    print('loading pickle')
+    data = pickle.load(open('dicts.pkl', 'rb'))
+    print('finished pickle')
+    lex_dict, bigram_dicts = data[0], data[1]
     result_list = find_missing_words(input, candidates, bigram_dicts, lex_dict)
 
     return result_list  # return your solution
