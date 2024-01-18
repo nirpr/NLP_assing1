@@ -21,6 +21,7 @@ from nltk import word_tokenize, ngrams
 #
 #     return trigram
 
+
 def fill_missing_words(text, trigram_model):
     list = []
     words = word_tokenize(text)
