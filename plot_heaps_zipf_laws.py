@@ -119,4 +119,3 @@ if __name__ == '__main__':
         pickle.dump(data, open('heap2.pkl', 'wb'))
     print('1')
     plot_heaps_law(pickle.load(open('heap2.pkl', 'rb')))
-
