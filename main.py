@@ -3,8 +3,6 @@ import random
 from collections import defaultdict
 import time
 
-import nltk
-nltk.download('punkt')
 
 
 def calc_bigram_prob(bigram_dicts, lex_dict, candidates, prev_word):
@@ -12,7 +10,7 @@ def calc_bigram_prob(bigram_dicts, lex_dict, candidates, prev_word):
     best_prob = ('', 0)
 
     for word in candidates:
-        bigram_prob = bigram_dicts[prev_word].get(word, 0) / unigram_count # problem here: /
+        bigram_prob = bigram_dicts[prev_word][word] / unigram_count # problem here: /
         # bigram_prob = bigram_dicts[prev_word].get(word, 0) / unigram_countAttributeError: /
         # 'int' object has no attribute 'get'
         if bigram_prob > best_prob[1]:
@@ -28,8 +26,8 @@ def find_missing_words(cloze, candidates, bigram_dicts, lex_dict):
     with open(candidates, 'r', encoding='utf8') as f2:
         candidates_text = f2.read()
 
-    words = nltk.word_tokenize(text)
-    candidates_lst = nltk.word_tokenize(candidates_text)
+    words = text.split()
+    candidates_lst = candidates_text.split()  # new change
     candidate = ''
     for i in range(len(words)):
         if i == 0 and words[i] == "__________":
@@ -72,7 +70,7 @@ def initialize_dicts(lexicon, corpus):
     with open(corpus, 'r', encoding='utf-8') as f2:
         prev_word = ''
         for i, line in enumerate(f2.readlines()):
-            tokens = nltk.word_tokenize(line)
+            tokens = line.split()  # change
             prev_word = update_dicts(tokens, prev_word, lexicon_dict, bigram_dicts)
             if i % 100000 == 0:
                 print(i)
@@ -83,7 +81,7 @@ def solve_cloze(input, candidates, lexicon, corpus):
     # todo: implement this function
     print(f'starting to solve the cloze {input} with {candidates} using {lexicon} and {corpus}')
     lex_dict, bigram_dicts = initialize_dicts(lexicon, corpus)
-    result_list = find_missing_words(input, candidates, lex_dict, bigram_dicts)
+    result_list = find_missing_words(input, candidates, bigram_dicts, lex_dict)
 
     return result_list  # return your solution
 
