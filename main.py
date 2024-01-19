@@ -7,11 +7,12 @@ import os.path
 
 
 def calc_bigram_prob(bigram_dicts, lex_dict, candidates, prev_word):
-    unigram_count = lex_dict[prev_word]
+    unigram_count = lex_dict[prev_word] + 1
+    vocab_size = len(lex_dict)
 
     best_prob = ('', 0)
     for word in candidates:
-        bigram_prob = bigram_dicts.get(prev_word, {}).get(word, 0) / unigram_count
+        bigram_prob = bigram_dicts.get(prev_word, {}).get(word, 0) / (unigram_count + vocab_size)
         if bigram_prob > best_prob[1]:
             best_prob = (word, bigram_prob)
 
@@ -28,13 +29,16 @@ def find_missing_words(cloze, candidates, bigram_dicts, lex_dict):
     words = text.split()
     candidates_lst = candidates_text.split()  # new change
     candidate = ''
+    print(candidates_lst)
     for i in range(len(words)):
         if i == 0 and words[i] == "__________":
-            candidate = max(lex_dict)
+            candidate = max(lex_dict, key=lex_dict.get)
         elif words[i] == "__________":
-            candidate = calc_bigram_prob(bigram_dicts, lex_dict, candidates_lst, words[i-1])
-    list.append(candidate)
-    candidates_lst.remove(candidate)
+            candidate = calc_bigram_prob(bigram_dicts, lex_dict, candidates_lst, words[i-1].lower())
+            list.append(candidate)
+            print(candidate)
+            if candidate in candidates_lst:
+                candidates_lst.remove(candidate)
     return list
 
 
@@ -42,7 +46,8 @@ def update_dicts(tokens, prev_word, lex_dict, bigram_dicts):
     for word in tokens:  # new change
         word = word.lower()
         lex_dict[word] = lex_dict.get(word, 0) + 1
-        bigram_dicts[prev_word][word] = bigram_dicts[prev_word].get(word, 0) + 1
+        if prev_word != '':
+            bigram_dicts[prev_word][word] = bigram_dicts[prev_word].get(word, 0) + 1
         prev_word = word
 
     return prev_word
