@@ -6,19 +6,22 @@ import pickle
 import os.path
 
 
-def calc_bigram_prob(bigram_dicts, lex_dict, candidates, prev_word):
-    unigram_count = lex_dict[prev_word] + 1
-    vocab_size = len(lex_dict)
+def calc_prob(unigram_dict, bigram_dicts, trigram_dicts, candidates, prev_word, prev_prev_word):
+    bigram_count = bigram_dicts.get(prev_prev_word, {}).get(prev_word, 0)
+    vocab_size = len(unigram_dict)
 
     best_prob = ('', 0)
     for word in candidates:
-        bigram_prob = bigram_dicts.get(prev_word, {}).get(word, 0) / (unigram_count + vocab_size)
-        if bigram_prob > best_prob[1]:
-            best_prob = (word, bigram_prob)
+        trigram_prob = trigram_dicts.get(prev_prev_word, {}).get(prev_word, {}).get(word, 0) + 1 \
+                      / (bigram_count + vocab_size)
+        if trigram_prob > best_prob[1]:
+            best_prob = (word, trigram_prob)
+        if best_prob == 0:
+            print(f'{word}')
     return best_prob[0]
 
 
-def find_missing_words(cloze, candidates, bigram_dicts, lex_dict):
+def find_missing_words(cloze, candidates, unigram_dict, bigram_dicts, trigram_dicts):
     list = []
     with open(cloze, 'r', encoding='utf8') as f1:
         text = f1.read()
@@ -32,43 +35,54 @@ def find_missing_words(cloze, candidates, bigram_dicts, lex_dict):
     print(candidates_lst)
     for i in range(len(words)):
         if i == 0 and words[i] == "__________":
-            candidate = max(lex_dict, key=lex_dict.get)
+            candidate = max(unigram_dict, key=unigram_dict.get)
         elif words[i] == "__________":
-            candidate = calc_bigram_prob(bigram_dicts, lex_dict, candidates_lst, words[i-1].lower())
+            candidate = calc_prob(unigram_dict, bigram_dicts, trigram_dicts
+                                  , candidates_lst, words[i-2].lower(), words[i-1].lower())
             list.append(candidate)
             if candidate in candidates_lst:
                 candidates_lst.remove(candidate)
     return list
 
 
-def update_dicts(tokens, prev_word, lex_dict, bigram_dicts):
-    for word in tokens:  # new change
+def update_dicts(tokens, prev_word, prev_prev_word, unigram_dict, bigram_dicts, trigram_dicts):
+    for word in tokens:
         word = word.lower()
-        lex_dict[word] = lex_dict.get(word, 0) + 1
+        unigram_dict[word] = unigram_dict.get(word, 0) + 1
         if prev_word != '':
             bigram_dicts[prev_word][word] = bigram_dicts[prev_word].get(word, 0) + 1
+            if prev_prev_word != '':
+                trigram_dicts[prev_prev_word][prev_word][word] = \
+                    trigram_dicts[prev_prev_word][prev_word].get(word, 0) + 1
+        prev_prev_word = prev_word
         prev_word = word
 
-    return prev_word
+    return prev_prev_word, prev_word
 
 
 def initialize_dicts(lexicon, corpus):
-    lexicon_dict = {}
-    bigram_dicts = defaultdict(dict) # new change
+    unigram_dict = defaultdict(int)
+    bigram_dicts = defaultdict(dict)
+    nested_defaultdict = lambda: defaultdict(lambda: defaultdict(int))
+    trigram_dicts = defaultdict(nested_defaultdict)
 
     with open(lexicon, 'r', encoding='utf8') as f1:
         for word in f1.readlines():  # because every line is a word in lexicon
-            lexicon_dict[word.rstrip('\n')] = 0
+            unigram_dict[word.rstrip('\n')] = 0
 
     with open(corpus, 'r', encoding='utf-8') as f2:
         prev_word = ''
+        prev_prev_word = ''
         for i, line in enumerate(f2.readlines()):
-            tokens = line.split()  # change
-            prev_word = update_dicts(tokens, prev_word, lexicon_dict, bigram_dicts)
+            tokens = line.split()
+            prev_prev_word, prev_word = \
+                update_dicts(tokens, prev_word, prev_prev_word, unigram_dict, bigram_dicts, trigram_dicts)
             if i % 100000 == 0:
                 print(i)
+            if i == 3000000:
+                break
 
-    data = (lexicon_dict, bigram_dicts)
+    data = unigram_dict, bigram_dicts, trigram_dicts
     return data
 
 
@@ -76,16 +90,19 @@ def solve_cloze(input, candidates, lexicon, corpus):
     # todo: implement this function
     print(f'starting to solve the cloze {input} with {candidates} using {lexicon} and {corpus}')
 
-    if not os.path.isfile('dicts.pkl'):
-        data = initialize_dicts(lexicon, corpus)
-        print('creating pickle')
-        pickle.dump(data, open('dicts.pkl', 'wb'))
+    # if not os.path.isfile('dicts.pkl'):
+    #     data = initialize_dicts(lexicon, corpus)
+    #     print('creating pickle')
+    #     pickle.dump(data, open('dicts.pkl', 'wb'))
+    #
+    # print('loading pickle')
+    # data = pickle.load(open('dicts.pkl', 'rb'))
+    # print('finished pickle')
+    # lex_dict, bigram_dicts = data[0], data[1]
+    # result_list = find_missing_words(input, candidates, bigram_dicts, lex_dict)
 
-    print('loading pickle')
-    data = pickle.load(open('dicts.pkl', 'rb'))
-    print('finished pickle')
-    lex_dict, bigram_dicts = data[0], data[1]
-    result_list = find_missing_words(input, candidates, bigram_dicts, lex_dict)
+    unigram_dict, bigram_dicts, trigram_dicts = initialize_dicts(lexicon, corpus)
+    result_list = find_missing_words(input, candidates, unigram_dict, bigram_dicts, trigram_dicts)
 
     return result_list  # return your solution
 
