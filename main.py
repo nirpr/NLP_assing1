@@ -15,7 +15,6 @@ def calc_bigram_prob(bigram_dicts, lex_dict, candidates, prev_word):
         bigram_prob = bigram_dicts.get(prev_word, {}).get(word, 0) / (unigram_count + vocab_size)
         if bigram_prob > best_prob[1]:
             best_prob = (word, bigram_prob)
-
     return best_prob[0]
 
 
@@ -28,6 +27,7 @@ def find_missing_words(cloze, candidates, bigram_dicts, lex_dict):
 
     words = text.split()
     candidates_lst = candidates_text.split()  # new change
+    random.shuffle(candidates_lst)
     candidate = ''
     print(candidates_lst)
     for i in range(len(words)):
@@ -36,7 +36,6 @@ def find_missing_words(cloze, candidates, bigram_dicts, lex_dict):
         elif words[i] == "__________":
             candidate = calc_bigram_prob(bigram_dicts, lex_dict, candidates_lst, words[i-1].lower())
             list.append(candidate)
-            print(candidate)
             if candidate in candidates_lst:
                 candidates_lst.remove(candidate)
     return list
