@@ -6,9 +6,9 @@ import pickle
 import os.path
 
 
-def calc_prob(unigram_dict, bigram_dicts, trigram_dicts, candidates, prev_word, prev_prev_word):
+def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, prev_prev_word):
     bigram_count = bigram_dicts.get(prev_prev_word, {}).get(prev_word, 0)
-    vocab_size = len(unigram_dict)
+    vocab_size = len(unigram_set)
 
     best_prob = ('', 0)
     for word in candidates:
@@ -21,7 +21,7 @@ def calc_prob(unigram_dict, bigram_dicts, trigram_dicts, candidates, prev_word, 
     return best_prob[0]
 
 
-def find_missing_words(cloze, candidates, unigram_dict, bigram_dicts, trigram_dicts):
+def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dicts):
     list = []
     with open(cloze, 'r', encoding='utf8') as f1:
         text = f1.read()
@@ -29,15 +29,17 @@ def find_missing_words(cloze, candidates, unigram_dict, bigram_dicts, trigram_di
         candidates_text = f2.read()
 
     words = text.split()
-    candidates_lst = candidates_text.split()  # new change
+    candidates_lst = candidates_text.split()
+    print(candidates_lst)
     random.shuffle(candidates_lst)
     candidate = ''
     print(candidates_lst)
     for i in range(len(words)):
         if i == 0 and words[i] == "__________":
-            candidate = max(unigram_dict, key=unigram_dict.get)
+            # candidate = max(unigram_dict, key=unigram_dict.get)
+            pass
         elif words[i] == "__________":
-            candidate = calc_prob(unigram_dict, bigram_dicts, trigram_dicts
+            candidate = calc_prob(unigram_set, bigram_dicts, trigram_dicts
                                   , candidates_lst, words[i-2].lower(), words[i-1].lower())
             list.append(candidate)
             if candidate in candidates_lst:
@@ -45,30 +47,30 @@ def find_missing_words(cloze, candidates, unigram_dict, bigram_dicts, trigram_di
     return list
 
 
-def update_dicts(tokens, prev_word, prev_prev_word, unigram_dict, bigram_dicts, trigram_dicts):
+def update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts):
     for word in tokens:
-        word = word.lower()
-        unigram_dict[word] = unigram_dict.get(word, 0) + 1
-        if prev_word != '':
-            bigram_dicts[prev_word][word] = bigram_dicts[prev_word].get(word, 0) + 1
-            if prev_prev_word != '':
-                trigram_dicts[prev_prev_word][prev_word][word] = \
-                    trigram_dicts[prev_prev_word][prev_word].get(word, 0) + 1
-        prev_prev_word = prev_word
-        prev_word = word
+        if word in unigram_set:
+            word = word.lower()
+            if prev_word != '':
+                bigram_dicts[prev_word][word] = bigram_dicts[prev_word].get(word, 0) + 1
+                if prev_prev_word != '':
+                    trigram_dicts[prev_prev_word][prev_word][word] = \
+                        trigram_dicts[prev_prev_word][prev_word].get(word, 0) + 1
+            prev_prev_word = prev_word
+            prev_word = word
 
     return prev_prev_word, prev_word
 
 
 def initialize_dicts(lexicon, corpus):
-    unigram_dict = defaultdict(int)
+    unigram_set = set()
     bigram_dicts = defaultdict(dict)
     nested_defaultdict = lambda: defaultdict(lambda: defaultdict(int))
     trigram_dicts = defaultdict(nested_defaultdict)
 
     with open(lexicon, 'r', encoding='utf8') as f1:
         for word in f1.readlines():  # because every line is a word in lexicon
-            unigram_dict[word.rstrip('\n')] = 0
+            unigram_set.add(word.rstrip('\n'))
 
     with open(corpus, 'r', encoding='utf-8') as f2:
         prev_word = ''
@@ -76,14 +78,13 @@ def initialize_dicts(lexicon, corpus):
         for i, line in enumerate(f2.readlines()):
             tokens = line.split()
             prev_prev_word, prev_word = \
-                update_dicts(tokens, prev_word, prev_prev_word, unigram_dict, bigram_dicts, trigram_dicts)
+                update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts)
             if i % 100000 == 0:
                 print(i)
-            if i == 3000000:
-                break
+            # if i == 3000000:
+            #     break
 
-    data = unigram_dict, bigram_dicts, trigram_dicts
-    return data
+    return unigram_set, bigram_dicts, trigram_dicts
 
 
 def solve_cloze(input, candidates, lexicon, corpus):
@@ -101,8 +102,8 @@ def solve_cloze(input, candidates, lexicon, corpus):
     # lex_dict, bigram_dicts = data[0], data[1]
     # result_list = find_missing_words(input, candidates, bigram_dicts, lex_dict)
 
-    unigram_dict, bigram_dicts, trigram_dicts = initialize_dicts(lexicon, corpus)
-    result_list = find_missing_words(input, candidates, unigram_dict, bigram_dicts, trigram_dicts)
+    unigram_set, bigram_dicts, trigram_dicts = initialize_dicts(lexicon, corpus)
+    result_list = find_missing_words(input, candidates, unigram_set, bigram_dicts, trigram_dicts)
 
     return result_list  # return your solution
 
