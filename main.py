@@ -5,6 +5,16 @@ import time
 
 
 def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, prev_prev_word):
+    """
+    The function calculates the best probability for a word from the candidate words
+    :param unigram_set: a set with all the lexicon words
+    :param bigram_dicts: dictionary of dictionaries with bi-grams
+    :param trigram_dicts: same as bigrams but with one more level back
+    :param candidates: list of tokenized candidates
+    :param prev_word: the previous word
+    :param prev_prev_word: the previous word of the previous word
+    :return: string: best probability
+    """
     bigram_count = bigram_dicts.get(prev_prev_word, {}).get(prev_word, 0)
     vocab_size = len(unigram_set)
 
@@ -12,13 +22,21 @@ def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, p
     for word in candidates:
         trigram_prob = (trigram_dicts.get(prev_prev_word, {}).get(prev_word, {}).get(word, 0) + 1) \
                       / (bigram_count + vocab_size)
-        print(f'best prob:{best_prob}, ({word}: {trigram_prob})')
         if trigram_prob > best_prob[1]:
             best_prob = (word, trigram_prob)
     return best_prob[0]
 
 
 def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dicts):
+    """
+    The function finds the missing words in a cloze.
+    :param cloze: the text with missing words
+    :param candidates: the text with the candidates
+    :param unigram_set: a set with all the lexicon words
+    :param bigram_dicts: dictionary of dictionaries with bi-grams
+    :param trigram_dicts: same as bigrams but with one more level back
+    :return: list of missing words by order
+    """
     list = []
     with open(cloze, 'r', encoding='utf8') as f1:
         text = f1.read()
@@ -43,6 +61,16 @@ def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dic
 
 
 def update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts):
+    """
+    This function updates all the dictionaries
+    :param tokens: a tokenized list of a sentence
+    :param prev_word: the previous word
+    :param prev_prev_word: the previous word of the previous word
+    :param unigram_set: a set with all the lexicon words
+    :param bigram_dicts: dictionary of dictionaries with bi-grams
+    :param trigram_dicts: same as bigrams but with one more level back
+    :return: prev_prev_word, prev_word
+    """
     for word in tokens:
         if word in unigram_set:
             word = word.lower()
@@ -58,6 +86,12 @@ def update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, t
 
 
 def initialize_dicts(lexicon, corpus):
+    """
+    Init function
+    :param lexicon: text of the lexicon
+    :param corpus: text of the corpus
+    :return: set of the lexicon and two dictionaries representing bi-grams and tri-grams.
+    """
     unigram_set = set()
     bigram_dicts = defaultdict(dict)
     nested_defaultdict = lambda: defaultdict(lambda: defaultdict(int))
@@ -76,20 +110,44 @@ def initialize_dicts(lexicon, corpus):
                 update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts)
             if i % 100000 == 0:
                 print(i)
-            if i == 8000000:
-                break
+            # if i == 8000000:
+            #     break
 
     return unigram_set, bigram_dicts, trigram_dicts
 
 
 def solve_cloze(input, candidates, lexicon, corpus):
-    # todo: implement this function
+    """
+
+    :param input: the cloze
+    :param candidates: text with candidates
+    :param lexicon: text of the lexicon
+    :param corpus: text of the corpus
+    :return: the list with missing words by order.
+    """
     print(f'starting to solve the cloze {input} with {candidates} using {lexicon} and {corpus}')
 
     unigram_set, bigram_dicts, trigram_dicts = initialize_dicts(lexicon, corpus)
     result_list = find_missing_words(input, candidates, unigram_set, bigram_dicts, trigram_dicts)
 
     return result_list  # return your solution
+
+
+def calc_success_percentage(solution_lst, candidates_file):
+    """
+    The function calculates the success prec
+    :param solution_lst: a list with the chosen words
+    :param candidates_file: text with candidates
+    :return:the success percentage.
+    """
+    with open(candidates_file, 'r', encoding='utf8') as f:
+        candidates_text = f.read()
+    candidates_lst = candidates_text.split()
+    correct_pred = 0
+    for i, j in zip(solution_lst, candidates_lst):
+        if i == j:
+            correct_pred += 1
+    return (correct_pred / len(solution_lst)) * 100
 
 
 if __name__ == '__main__':
@@ -103,6 +161,7 @@ if __name__ == '__main__':
                            config['corpus'])
 
     print('cloze solution:', solution)
+    print(calc_success_percentage(solution, config['candidates_filename']))
     end_time = time.time()
     elapsed_time = (end_time - start_time) / 60
     print('Elapsed time:', elapsed_time, 'minutes')
