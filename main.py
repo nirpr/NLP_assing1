@@ -2,8 +2,6 @@ import json
 import random
 from collections import defaultdict
 import time
-import pickle
-import os.path
 
 
 def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, prev_prev_word):
@@ -12,12 +10,11 @@ def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, p
 
     best_prob = ('', 0)
     for word in candidates:
-        trigram_prob = trigram_dicts.get(prev_prev_word, {}).get(prev_word, {}).get(word, 0) + 1 \
+        trigram_prob = (trigram_dicts.get(prev_prev_word, {}).get(prev_word, {}).get(word, 0) + 1) \
                       / (bigram_count + vocab_size)
+        print(f'best prob:{best_prob}, ({word}: {trigram_prob})')
         if trigram_prob > best_prob[1]:
             best_prob = (word, trigram_prob)
-        if best_prob == 0:
-            print(f'{word}')
     return best_prob[0]
 
 
@@ -30,20 +27,18 @@ def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dic
 
     words = text.split()
     candidates_lst = candidates_text.split()
-    print(candidates_lst)
     random.shuffle(candidates_lst)
     candidate = ''
-    print(candidates_lst)
     for i in range(len(words)):
         if i == 0 and words[i] == "__________":
-            # candidate = max(unigram_dict, key=unigram_dict.get)
-            pass
+            candidate = candidates_lst[0]
+            list.append(candidate)
         elif words[i] == "__________":
             candidate = calc_prob(unigram_set, bigram_dicts, trigram_dicts
-                                  , candidates_lst, words[i-2].lower(), words[i-1].lower())
+                                  , candidates_lst, words[i-1].lower(), words[i-2].lower())
             list.append(candidate)
-            if candidate in candidates_lst:
-                candidates_lst.remove(candidate)
+        if candidate in candidates_lst:
+            candidates_lst.remove(candidate)
     return list
 
 
@@ -81,8 +76,8 @@ def initialize_dicts(lexicon, corpus):
                 update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts)
             if i % 100000 == 0:
                 print(i)
-            # if i == 3000000:
-            #     break
+            if i == 8000000:
+                break
 
     return unigram_set, bigram_dicts, trigram_dicts
 
@@ -90,17 +85,6 @@ def initialize_dicts(lexicon, corpus):
 def solve_cloze(input, candidates, lexicon, corpus):
     # todo: implement this function
     print(f'starting to solve the cloze {input} with {candidates} using {lexicon} and {corpus}')
-
-    # if not os.path.isfile('dicts.pkl'):
-    #     data = initialize_dicts(lexicon, corpus)
-    #     print('creating pickle')
-    #     pickle.dump(data, open('dicts.pkl', 'wb'))
-    #
-    # print('loading pickle')
-    # data = pickle.load(open('dicts.pkl', 'rb'))
-    # print('finished pickle')
-    # lex_dict, bigram_dicts = data[0], data[1]
-    # result_list = find_missing_words(input, candidates, bigram_dicts, lex_dict)
 
     unigram_set, bigram_dicts, trigram_dicts = initialize_dicts(lexicon, corpus)
     result_list = find_missing_words(input, candidates, unigram_set, bigram_dicts, trigram_dicts)
