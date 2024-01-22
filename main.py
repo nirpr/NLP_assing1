@@ -26,6 +26,49 @@ def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, p
             best_prob = (word, trigram_prob)
     return best_prob[0]
 
+def calc_prob_matrix(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, prev_prev_word):
+    bigram_count = bigram_dicts.get(prev_prev_word, {}).get(prev_word, 0)
+    vocab_size = len(unigram_set)
+    sub_prob_list = {}
+
+    for word in candidates:
+        trigram_prob = (trigram_dicts.get(prev_prev_word, {}).get(prev_word, {}).get(word, 0) + 1) \
+                      / (bigram_count + vocab_size)
+        sub_prob_list[word] = trigram_prob
+
+    result_dict = dict(sorted(sub_prob_list.items(), key=lambda item: item[1], reverse=True))
+    return result_dict
+
+def build_list_by_matrix(matrix):
+    result_list = []
+
+    # כל שורה היא המקום החסר בטקסט כביכול, והיא מכילה כאן מילון ממוין של מילים מהאופציות וההסתברות שהן יפיעו פה
+    for row in matrix:
+        found = False
+        keys_list = list(row.keys())
+        values_list = list(row.values())
+
+        while not found:
+            for i in range(len(row)):
+                champ_name = keys_list[i]
+                champ_score = values_list[i]
+                higher_exist = False
+
+                for A_row in matrix:
+                    if A_row[champ_name] > champ_score:
+                        higher_exist = True
+                        break
+
+                if not higher_exist:
+                    result_list.append(champ_name)
+                    found = True
+                    break
+                elif i == 11:
+                    result_list.append(champ_name)
+                    found = True
+
+    return result_list
+
 
 def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dicts):
     """
@@ -37,7 +80,6 @@ def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dic
     :param trigram_dicts: same as bigrams but with one more level back
     :return: list of missing words by order
     """
-    list = []
     with open(cloze, 'r', encoding='utf8') as f1:
         text = f1.read()
     with open(candidates, 'r', encoding='utf8') as f2:
@@ -46,18 +88,15 @@ def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dic
     words = text.split()
     candidates_lst = candidates_text.split()
     random.shuffle(candidates_lst)
-    candidate = ''
+    matrix = []
+
     for i in range(len(words)):
-        if i == 0 and words[i] == "__________":
-            candidate = candidates_lst[0]
-            list.append(candidate)
-        elif words[i] == "__________":
-            candidate = calc_prob(unigram_set, bigram_dicts, trigram_dicts
+        if words[i] == "__________":
+            sub_matrix = calc_prob_matrix(unigram_set, bigram_dicts, trigram_dicts
                                   , candidates_lst, words[i-1].lower(), words[i-2].lower())
-            list.append(candidate)
-        if candidate in candidates_lst:
-            candidates_lst.remove(candidate)
-    return list
+            matrix.append(sub_matrix)
+
+    return build_list_by_matrix(matrix)
 
 
 def update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts):
@@ -110,8 +149,8 @@ def initialize_dicts(lexicon, corpus):
                 update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts)
             if i % 100000 == 0:
                 print(i)
-            # if i == 8000000:
-            #     break
+            if i == 8000000:
+                break
 
     return unigram_set, bigram_dicts, trigram_dicts
 
