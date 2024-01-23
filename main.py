@@ -3,6 +3,8 @@ import random
 from collections import defaultdict
 import time
 
+import numpy as np
+
 
 def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, prev_prev_word):
     """
@@ -17,14 +19,13 @@ def calc_prob(unigram_set, bigram_dicts, trigram_dicts, candidates, prev_word, p
     """
     bigram_count = bigram_dicts.get(prev_prev_word, {}).get(prev_word, 0)
     vocab_size = len(unigram_set)
+    probabilities = []
 
-    best_prob = ('', 0)
     for word in candidates:
         trigram_prob = (trigram_dicts.get(prev_prev_word, {}).get(prev_word, {}).get(word, 0) + 1) \
                       / (bigram_count + vocab_size)
-        if trigram_prob > best_prob[1]:
-            best_prob = (word, trigram_prob)
-    return best_prob[0]
+        probabilities.append((word, trigram_prob))
+    return probabilities
 
 
 def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dicts):
@@ -37,27 +38,47 @@ def find_missing_words(cloze, candidates, unigram_set, bigram_dicts, trigram_dic
     :param trigram_dicts: same as bigrams but with one more level back
     :return: list of missing words by order
     """
-    list = []
+    res_lst = []
     with open(cloze, 'r', encoding='utf8') as f1:
         text = f1.read()
     with open(candidates, 'r', encoding='utf8') as f2:
         candidates_text = f2.read()
 
+    prob_matrix, probabilities = [], []
     words = text.split()
     candidates_lst = candidates_text.split()
     random.shuffle(candidates_lst)
     candidate = ''
     for i in range(len(words)):
-        if i == 0 and words[i] == "__________":
-            candidate = candidates_lst[0]
-            list.append(candidate)
-        elif words[i] == "__________":
-            candidate = calc_prob(unigram_set, bigram_dicts, trigram_dicts
-                                  , candidates_lst, words[i-1].lower(), words[i-2].lower())
-            list.append(candidate)
-        if candidate in candidates_lst:
-            candidates_lst.remove(candidate)
-    return list
+        # if i == 0 and words[i] == "__________":
+        #     candidate = candidates_lst[0]
+        #     # list.append(candidate)
+        if words[i] == "__________":
+            probabilities = calc_prob(unigram_set, bigram_dicts, trigram_dicts
+                                      , candidates_lst, words[i-1].lower(), words[i-2].lower())
+            prob_matrix.append(probabilities)
+
+    res_lst_with_index = []
+
+    while any(value != -1 for row in prob_matrix for _, value in row):
+        max_value, max_row, max_col = max(
+            (value, i, j) for i, row in enumerate(prob_matrix) for j, (_, value) in enumerate(row) if value != -1)
+
+        # Append tuple[0] to res_lst
+        res_lst_with_index.append((prob_matrix[max_row][max_col][0], max_row))
+
+        # Change the indexing of the entire row and column to -1
+        for i in range(len(prob_matrix)):
+            prob_matrix[i][max_col] = (prob_matrix[i][max_col][0], -1)
+        prob_matrix[max_row] = [(item[0], -1) for item in prob_matrix[max_row]]
+
+    # Sort the result list by the row index
+    res_lst_with_index.sort(key=lambda x: x[1])
+
+    # Extract only the fruit names from the sorted result list
+    res_lst = [item[0] for item in res_lst_with_index]
+
+    return res_lst
 
 
 def update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts):
@@ -110,8 +131,8 @@ def initialize_dicts(lexicon, corpus):
                 update_dicts(tokens, prev_word, prev_prev_word, unigram_set, bigram_dicts, trigram_dicts)
             if i % 100000 == 0:
                 print(i)
-            # if i == 8000000:
-            #     break
+            if i == 8000000:
+                break
 
     return unigram_set, bigram_dicts, trigram_dicts
 
@@ -161,7 +182,8 @@ if __name__ == '__main__':
                            config['corpus'])
 
     print('cloze solution:', solution)
-    print(calc_success_percentage(solution, config['candidates_filename']))
+    percentage = calc_success_percentage(solution, config['candidates_filename'])
+    print(f'success rate:{percentage}%')
     end_time = time.time()
     elapsed_time = (end_time - start_time) / 60
     print('Elapsed time:', elapsed_time, 'minutes')
