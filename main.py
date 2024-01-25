@@ -167,7 +167,7 @@ def calc_success_percentage(solution_lst, candidates_file):
     for i, j in zip(solution_lst, candidates_lst):
         if i == j:
             correct_pred += 1
-    return (correct_pred / len(solution_lst)) * 100
+    return (correct_pred / len(candidates_lst)) * 100
 
 
 if __name__ == '__main__':
